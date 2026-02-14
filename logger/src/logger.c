@@ -58,7 +58,8 @@ void logger_set_output(logger_t *logger, log_output_func_t func)
     return;  /* 唯一出口 */
 }
 
-void logger_log(logger_t *logger, log_level_t level, const char *format, ...)
+/* va_list 版本：实际执行格式化与输出，并自动添加换行符 */
+void logger_logv(logger_t *logger, log_level_t level, const char *format, va_list args)
 {
     if (logger == NULL || level > logger->level)
     {
@@ -74,14 +75,11 @@ void logger_log(logger_t *logger, log_level_t level, const char *format, ...)
         case LOG_LEVEL_D: level_char = 'D'; break;
         case LOG_LEVEL_T: level_char = 'T'; break;
         /* default: 保持 '?' */
-        default: level_char = '?';
     }
 
-    va_list args;
-    va_start(args, format);
+    /* 格式化用户日志内容 */
     char user_buffer[1024];
-    int len = vsnprintf(user_buffer, sizeof(user_buffer), format , args);
-    va_end(args);
+    int len = vsnprintf(user_buffer, sizeof(user_buffer), format, args);
 
     /* 自动添加换行符（如果末尾不是换行且缓冲区足够） */
     if (len > 0 && len < (int)sizeof(user_buffer) - 1 && user_buffer[len - 1] != '\n')
@@ -90,7 +88,18 @@ void logger_log(logger_t *logger, log_level_t level, const char *format, ...)
         user_buffer[len + 1] = '\0';
     }
 
+    /* 输出带有等级前缀的日志 */
     logger->output_func("[%c] %s", level_char, user_buffer);
 
     return;  /* 唯一出口2：正常输出 */
+}
+
+/* 可变参数版本：转发给 logger_logv */
+void logger_log(logger_t *logger, log_level_t level, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    logger_logv(logger, level, format, args);
+    va_end(args);
+    return;  /* 唯一出口 */
 }

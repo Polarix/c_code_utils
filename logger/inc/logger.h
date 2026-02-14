@@ -84,6 +84,15 @@ LOGUTILS_API void logger_set_output(logger_t *logger, log_output_func_t func);
 /* ========== 日志记录 ========== */
 
 /**
+ * @brief 核心日志记录函数（va_list 版本，用于二次封装）
+ * @param logger 日志器指针
+ * @param level  本条日志的等级
+ * @param format 格式化字符串（printf 风格）
+ * @param args   va_list 可变参数列表
+ */
+LOGUTILS_API void logger_logv(logger_t *logger, log_level_t level, const char *format, va_list args);
+
+/**
  * @brief 核心日志记录函数
  * @param logger 日志器指针
  * @param level  本条日志的等级
