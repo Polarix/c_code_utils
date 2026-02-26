@@ -438,6 +438,87 @@ static void test_edge_cases_and_errors(void)
 }
 
 /**
+ * @brief 测试 utf8_strclen 函数
+ */
+static void test_utf8_strclen(void)
+{
+    printf("Testing utf8_strclen...\n");
+    
+    const uint8_t* test_strings[] = {
+        (const uint8_t*)"",                    /* 空字符串 */
+        (const uint8_t*)"Hello",                /* ASCII */
+        (const uint8_t*)"Hello, 世界!",         /* 混合 ASCII 和中文 */
+        (const uint8_t*)"🌍",                   /* 4字节UTF-8 (U+1F30D) */
+        (const uint8_t*)"Hello, 🌍",            /* 混合 */
+        NULL
+    };
+    /* 修正：第三个字符串应为10个字符 */
+    size_t expected_counts[] = {0, 5, 10, 1, 8};
+    
+    for (int i = 0; test_strings[i] != NULL; i++)
+    {
+        size_t count = utf8_strclen(test_strings[i]);
+        printf("  String %d: \"%s\" -> %zu characters (expected %zu) %s\n", 
+               i+1, test_strings[i], count, expected_counts[i],
+               (count == expected_counts[i]) ? "PASS" : "FAIL");
+    }
+    
+    /* 测试无效UTF-8序列的计数行为 */
+    const uint8_t invalid_utf8[] = {0xC0, 0x80, 0x41, 0}; /* 过长的0x00编码, 然后是'A' */
+    size_t count_invalid = utf8_strclen(invalid_utf8);
+    printf("  Invalid UTF-8 (overlong null + 'A'): %zu characters (should stop at first invalid, so 0) %s\n",
+           count_invalid, (count_invalid == 0) ? "PASS" : "FAIL");
+    
+    printf("\n");
+}
+
+/**
+ * @brief 测试 utf16_strclen 函数
+ */
+static void test_utf16_strclen(void)
+{
+    printf("Testing utf16_strclen...\n");
+    
+    /* 测试字符串: "Hello" (ASCII) 在UTF-16 LE */
+    const uint16_t hello_le[] = {0x0048, 0x0065, 0x006C, 0x006C, 0x006F, 0};
+    size_t count_hello = utf16_strclen(hello_le, UTF16_LE);
+    printf("  UTF-16 LE \"Hello\": %zu characters (expected 5) %s\n",
+           count_hello, (count_hello == 5) ? "PASS" : "FAIL");
+    
+    /* 测试字符串: "Hello, 世界!" 在UTF-16 LE */
+    const uint16_t hello_world_le[] = {0x0048, 0x0065, 0x006C, 0x006C, 0x006F, 0x002C, 0x0020, 0x4E16, 0x754C, 0x0021, 0};
+    size_t count_world = utf16_strclen(hello_world_le, UTF16_LE);
+    /* 修正：应为10个字符 */
+    printf("  UTF-16 LE \"Hello, 世界!\": %zu characters (expected 10) %s\n",
+           count_world, (count_world == 10) ? "PASS" : "FAIL");
+    
+    /* 测试字符串: 包含代理对 (U+1F30D) 在UTF-16 LE: 0xD83C 0xDF0D */
+    const uint16_t earth_le[] = {0xD83C, 0xDF0D, 0};
+    size_t count_earth = utf16_strclen(earth_le, UTF16_LE);
+    printf("  UTF-16 LE \"🌍\": %zu characters (expected 1) %s\n",
+           count_earth, (count_earth == 1) ? "PASS" : "FAIL");
+    
+    /* 测试空字符串 */
+    const uint16_t empty[] = {0};
+    size_t count_empty = utf16_strclen(empty, UTF16_LE);
+    printf("  Empty string: %zu characters (expected 0) %s\n",
+           count_empty, (count_empty == 0) ? "PASS" : "FAIL");
+    
+    /* 测试无效UTF-16序列 (孤立的低代理项) */
+    const uint16_t invalid_utf16[] = {0xDC00, 0x0041, 0}; /* 孤立的低代理项，然后是'A' */
+    size_t count_invalid = utf16_strclen(invalid_utf16, UTF16_LE);
+    printf("  Invalid UTF-16 (lone low surrogate + 'A'): %zu characters (should stop at invalid, so 0) %s\n",
+           count_invalid, (count_invalid == 0) ? "PASS" : "FAIL");
+    
+    /* 测试UTF16_NATIVE */
+    size_t count_native = utf16_strclen(hello_le, UTF16_NATIVE);
+    printf("  UTF16_NATIVE for same string: %zu (should equal 5) %s\n",
+           count_native, (count_native == 5) ? "PASS" : "FAIL");
+    
+    printf("\n");
+}
+
+/**
  * @brief 主函数
  * 
  * @return int 程序退出码
@@ -456,6 +537,8 @@ int main(void)
     test_codepoint_utf16_conversion();
     test_utf8_utf16_conversion();
     test_edge_cases_and_errors();
+    test_utf8_strclen();    /* 新增测试 */
+    test_utf16_strclen();   /* 新增测试 */
     
     printf("========================================\n");
     printf("All tests completed\n");

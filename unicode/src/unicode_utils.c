@@ -326,6 +326,73 @@ size_t utf16_strlen(const uint16_t* utf16_str, utf16_byte_order_t byte_order)
 }
 
 /**
+ * @brief 计算UTF-8字符串中的字符数（码点数量）
+ * 
+ * @param utf8_str UTF-8字符串（必须以null结尾）
+ * @return size_t 字符数，若输入为NULL则返回0
+ */
+size_t utf8_strclen(const uint8_t* utf8_str)
+{
+    size_t count = 0;
+    size_t i = 0;
+    uint32_t codepoint;
+    size_t char_len;
+    conv_result_t result = CONV_SUCCESS;
+
+    if (utf8_str != NULL)
+    {
+        while (utf8_str[i] != 0 && result == CONV_SUCCESS)
+        {
+            result = utf8_to_codepoint(&utf8_str[i], &codepoint, &char_len);
+            if (result == CONV_SUCCESS)
+            {
+                count++;
+                i += char_len;
+            }
+        }
+    }
+
+    return count;
+}
+
+/**
+ * @brief 计算UTF-16字符串中的字符数（码点数量）
+ * 
+ * @param utf16_str UTF-16字符串（必须以null结尾）
+ * @param byte_order 字节序
+ * @return size_t 字符数，若输入为NULL则返回0
+ */
+size_t utf16_strclen(const uint16_t* utf16_str, utf16_byte_order_t byte_order)
+{
+    size_t count = 0;
+    size_t i = 0;
+    uint32_t codepoint;
+    size_t char_len;
+    conv_result_t result = CONV_SUCCESS;
+    utf16_byte_order_t effective_order = byte_order;
+
+    if (utf16_str != NULL)
+    {
+        if (effective_order == UTF16_NATIVE)
+        {
+            effective_order = get_native_byte_order();
+        }
+
+        while (utf16_str[i] != 0 && result == CONV_SUCCESS)
+        {
+            result = utf16_to_codepoint(&utf16_str[i], &codepoint, effective_order, &char_len);
+            if (result == CONV_SUCCESS)
+            {
+                count++;
+                i += char_len;
+            }
+        }
+    }
+
+    return count;
+}
+
+/**
  * @brief 计算存储UTF-8字符串所需的最大字节数
  * 
  * @param utf16_str UTF-16字符串

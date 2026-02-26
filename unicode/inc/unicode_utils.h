@@ -88,6 +88,23 @@ size_t utf8_strlen(const uint8_t* utf8_str);
 size_t utf16_strlen(const uint16_t* utf16_str, utf16_byte_order_t byte_order);
 
 /**
+ * @brief 计算UTF-8字符串中的字符数（码点数量）
+ * 
+ * @param utf8_str UTF-8字符串（必须以null结尾）
+ * @return size_t 字符数，若输入为NULL则返回0
+ */
+size_t utf8_strclen(const uint8_t* utf8_str);
+
+/**
+ * @brief 计算UTF-16字符串中的字符数（码点数量）
+ * 
+ * @param utf16_str UTF-16字符串（必须以null结尾）
+ * @param byte_order 字节序
+ * @return size_t 字符数，若输入为NULL则返回0
+ */
+size_t utf16_strclen(const uint16_t* utf16_str, utf16_byte_order_t byte_order);
+
+/**
  * @brief 计算存储UTF-8字符串所需的最大字节数
  * 
  * @param utf16_str UTF-16字符串
