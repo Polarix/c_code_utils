@@ -412,6 +412,12 @@ protected:
     void                            set_state(thread_state_t new_state);
 
     /**
+     * @brief 获取线程状态
+     * @return 线程状态
+     */
+    thread_state_t                  get_state(void);
+
+    /**
      * @brief 设置线程是否可以被取消（仅对调用函数的线程自身有效）
      * @param state 线程是否可以被取消
      * @param type 线程取消类型，state 为不可取消时此参数无效
@@ -428,8 +434,9 @@ public:
     /**
      * @brief 构造函数
      * @param thread_name 线程名称，默认为 nullptr
+     * @param joinable 是否可连接（可被 join），默认为 true
      */
-    explicit                        thread(const char* thread_name = nullptr);
+    explicit                        thread(const char* thread_name = nullptr, bool joinable = true);
 
     /**
      * @brief 拷贝构造函数（禁用）
@@ -475,12 +482,6 @@ public:
     static void                     yield(void);
 
     /**
-     * @brief 获取线程状态
-     * @return 线程状态
-     */
-    thread_state_t                  get_state(void);
-
-    /**
      * @brief 获取当前线程ID
      * @return 线程ID
      */
@@ -498,6 +499,12 @@ public:
      * @return 0-成功，其他-错误码
      */
     int                             join(void** exit_code = nullptr);
+
+    /**
+     * @brief 分离线程（使线程变为不可连接）
+     * @return 0-成功，其他-错误码
+     */
+    int                             detach(void);
 
     /**
      * @brief 获取线程名称

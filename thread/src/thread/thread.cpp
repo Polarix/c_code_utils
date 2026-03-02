@@ -11,7 +11,6 @@
 #include <time.h>
 #endif
 
-#include <log/misc_log.h>
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
@@ -799,12 +798,13 @@ void* thread::thread_start_proc(void* ptr)
 /**
  * @brief 线程构造函数
  * @param thread_name 线程名称
+ * @param joinable 是否可连接
  */
-thread::thread(const char* thread_name)
+thread::thread(const char* thread_name, bool joinable)
  : m_handle(INVALID_THREAD_HANDLE)
  , m_state(THREAD_STATE_IDLE)
  , m_mutex(true)   /* 递归互斥锁 */
- , m_is_joinable(true)
+ , m_is_joinable(joinable)
 {
     if (thread_name != nullptr)
     {
@@ -833,7 +833,7 @@ void thread::force_stop(void)
 
     if (m_handle != INVALID_THREAD_HANDLE)
     {
-        const thread_state_t now_state = m_state;
+        const thread_state_t now_state = get_state();
         /* 线程运行中则尝试结束 */
         if (now_state == THREAD_STATE_RUNNING)
         {
@@ -940,7 +940,7 @@ thread_err_t thread::start(void)
         mutex_locker locker(m_mutex);
 
         /* 检查线程状态 */
-        if (m_state == THREAD_STATE_RUNNING)
+        if (get_state() == THREAD_STATE_RUNNING)
         {
             THREAD_WRN_LOG("Thread already running.");
             err = thread_err_running;
@@ -964,8 +964,9 @@ thread_err_t thread::start(void)
             break;
         }
 
-        /* 设置为可连接线程 */
-        api_result = ::pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+        /* 根据 m_is_joinable 设置分离状态 */
+        int detachstate = m_is_joinable ? PTHREAD_CREATE_JOINABLE : PTHREAD_CREATE_DETACHED;
+        api_result = ::pthread_attr_setdetachstate(&attr, detachstate);
         if (0 != api_result)
         {
             THREAD_ERR_LOG("pthread_attr_setdetachstate() failed, result %d.", api_result);
@@ -1075,6 +1076,7 @@ void thread::sleep_ms(unsigned int sleep_ms)
 #ifdef _WIN32
     ::Sleep(sleep_ms);
 #else
+    /* 使用 nanosleep，它是取消点 */
     struct timespec req;
     req.tv_sec = sleep_ms / 1000;
     req.tv_nsec = (sleep_ms % 1000) * 1000000;
@@ -1082,7 +1084,7 @@ void thread::sleep_ms(unsigned int sleep_ms)
     struct timespec rem;
     while (nanosleep(&req, &rem) == -1 && errno == EINTR)
     {
-        // 被信号中断（包括取消信号），用剩余时间继续等待
+        /* 被信号中断，继续等待剩余时间 */
         req = rem;
     }
 #endif
@@ -1099,22 +1101,72 @@ int thread::join(void** exit_code)
 
     if (m_handle != INVALID_THREAD_HANDLE)
     {
-        rtn = ::pthread_join(m_handle, exit_code);
-        if (rtn == 0)
+        /* 检查是否可连接 */
+        if (!m_is_joinable)
         {
-            m_mutex.lock();
-            m_handle = INVALID_THREAD_HANDLE;
-            m_state = THREAD_STATE_EXITED;
-            m_mutex.unlock();
+            THREAD_ERR_LOG("Thread is not joinable");
+            rtn = EINVAL;  /* 返回标准错误码 */
         }
         else
         {
-            THREAD_ERR_LOG("pthread_join() failed with error %d", rtn);
+            rtn = ::pthread_join(m_handle, exit_code);
+            if (rtn == 0)
+            {
+                m_mutex.lock();
+                m_handle = INVALID_THREAD_HANDLE;
+                m_state = THREAD_STATE_EXITED;
+                m_mutex.unlock();
+            }
+            else
+            {
+                THREAD_ERR_LOG("pthread_join() failed with error %d", rtn);
+            }
         }
     }
     else
     {
         THREAD_ERR_LOG("Invalid thread handle");
+    }
+
+    return rtn;
+}
+
+/**
+ * @brief 分离线程
+ * @return 0-成功，其他-错误码
+ */
+int thread::detach(void)
+{
+    int rtn = -1;
+
+    mutex_locker locker(m_mutex);
+
+    if (m_handle != INVALID_THREAD_HANDLE)
+    {
+        /* 检查是否已经是分离状态 */
+        if (!m_is_joinable)
+        {
+            THREAD_WRN_LOG("Thread already detached");
+            rtn = 0;  /* 已经是分离状态，视为成功 */
+        }
+        else
+        {
+            rtn = ::pthread_detach(m_handle);
+            if (rtn == 0)
+            {
+                m_is_joinable = false;
+                THREAD_INF_LOG("Thread detached successfully");
+            }
+            else
+            {
+                THREAD_ERR_LOG("pthread_detach() failed with error %d", rtn);
+            }
+        }
+    }
+    else
+    {
+        THREAD_ERR_LOG("Invalid thread handle");
+        rtn = EINVAL;
     }
 
     return rtn;

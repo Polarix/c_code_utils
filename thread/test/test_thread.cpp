@@ -134,7 +134,7 @@ protected:
 };
 
 /*----------------------------------------------------------------------------
- * 强制停止测试（不等待，直接析构或调用 force_stop）
+ * 强制停止测试（通过析构）
  *----------------------------------------------------------------------------*/
 class ForceStopThread : public thread
 {
@@ -147,6 +147,24 @@ protected:
             thread::sleep_ms(500);
             thread::test_cancel();   // 显式取消点，使线程可响应取消请求（Windows 下必需）
         }
+        return nullptr;
+    }
+};
+
+/*----------------------------------------------------------------------------
+ * 分离线程测试（不可连接）
+ *----------------------------------------------------------------------------*/
+class DetachedThread : public thread
+{
+public:
+    DetachedThread(const char* name, bool joinable) : thread(name, joinable) {}
+
+protected:
+    virtual void* entry() override
+    {
+        THREAD_TEST_INF_LOG("DetachedThread started, will sleep 1s and exit");
+        thread::sleep_ms(1000);
+        THREAD_TEST_INF_LOG("DetachedThread exiting");
         return nullptr;
     }
 };
@@ -247,7 +265,22 @@ int main()
     }
     THREAD_TEST_INF_LOG("Force stop done");
 
-    /* 7. 当前线程处理器测试 */
+    /* 7. 分离线程测试 */
+    THREAD_TEST_INF_LOG("\n--- Test detached thread ---");
+    {
+        DetachedThread dt("Detached", false);   // 创建分离线程
+        dt.start();
+        // 不能 join，稍等一会儿确保线程执行完成
+        spin_wait(2000);
+        // 尝试 join 应失败
+        int ret = dt.join();
+        if (ret != 0)
+        {
+            THREAD_TEST_WRN_LOG("Join detached thread returned %d (expected)", ret);
+        }
+    }
+
+    /* 8. 当前线程处理器测试 */
     THREAD_TEST_INF_LOG("\n--- Test self thread handler ---");
     {
         self_thread_handler& self = thread::self();
