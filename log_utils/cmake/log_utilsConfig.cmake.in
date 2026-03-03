@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/log_utilsTargets.cmake")
+
+set(log_utils_INCLUDE_DIRS "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@/log_utils")
+set(log_utils_LIBRARIES log_utils::log_utils)
+
+check_required_components(log_utils)
