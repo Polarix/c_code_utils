@@ -79,5 +79,23 @@ cmake --build ./
 ./bin/log_utils_demo
 ```
 
-- #### 使用
-如果使用head-lony模式，需要在生成库的编译环境中**定义LOG_UTILS_HEAD_ONLY**宏以确保接口的声明和定义均被正确包含。
+## 注意事项
+- 如果使用head-lony模式，需要在生成库的编译环境中**定义LOG_UTILS_HEAD_ONLY**宏以确保接口的声明和定义均被正确包含。
+
+- 框架本身未考虑线程安全设计，如果涉及多线程操作，需要额外进行线程安全相关的封装，以下是一个示例：
+``` c
+static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void xdream_log(xdream_log_level_t level, const char* format, ...)
+{
+    pthread_mutex_lock(&log_mutex);
+    if (s_xdream_log != NULL)
+    {
+        va_list args;
+        va_start(args, format);
+        logger_logv(s_xdream_log, xdream_log_level(level), format, args);
+        va_end(args);
+    }
+    pthread_mutex_unlock(&log_mutex);
+}
+```
