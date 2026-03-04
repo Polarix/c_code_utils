@@ -7,10 +7,12 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 include(GNUInstallDirs)
 
-# 选项：header-only 模式（不构建库）
-option(LOG_UTILS_HEAD_ONLY "Use header-only mode (no library build)" OFF)
-# 当构建库时，由 BUILD_SHARED_LIBS 控制动态/静态
+# Head-only模式，默认开启
+option(LOG_UTILS_HEAD_ONLY "Use header-only mode (no library build)" ON)
+# 非Head-only模式下，默认编译静态库
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
+# 编译演示程序，默认关闭
+option(BUILD_LOG_UTILS_DEMO "Build demonstration program" OFF)
 
 # 头文件
 set(LOG_UTILS_HDR inc/log_utils.h)
@@ -80,18 +82,20 @@ else()
     message(STATUS "Header-only mode: no library will be built. Only headers installed.")
 endif()
 
-# ========== 演示程序（始终构建） ==========
-add_executable(log_utils_demo demo/log_utils_demo.c)
-target_include_directories(log_utils_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+# ========== 演示程序（可选） ==========
+if(BUILD_LOG_UTILS_DEMO)
+    add_executable(log_utils_demo demo/log_utils_demo.c)
+    target_include_directories(log_utils_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
 
-if(NOT LOG_UTILS_HEAD_ONLY)
-    # 独立库模式：链接库
-    target_link_libraries(log_utils_demo log_utils)
-else()
-    # Header-only 模式：需要定义宏以获取函数实现
-    target_compile_definitions(log_utils_demo PRIVATE LOG_UTILS_HEAD_ONLY)
+    if(NOT LOG_UTILS_HEAD_ONLY)
+        # 独立库模式：链接库
+        target_link_libraries(log_utils_demo log_utils)
+    else()
+        # Header-only 模式：需要定义宏以获取函数实现
+        target_compile_definitions(log_utils_demo PRIVATE LOG_UTILS_HEAD_ONLY)
+    endif()
+
+    set_target_properties(log_utils_demo PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
 endif()
-
-set_target_properties(log_utils_demo PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
