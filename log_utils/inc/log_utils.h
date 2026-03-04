@@ -9,18 +9,28 @@
 extern "C" {
 #endif
 
-/* ========== 跨平台符号导出宏（仅独立编译模式且构建 DLL 时有效）========== */
-#if !defined(LOG_UTILS_HEAD_ONLY)
-    #if defined(_WIN32) && defined(LOG_UTILS_EXPORTS)
-        #define LOG_UTILS_API __declspec(dllexport)
-    #elif defined(__GNUC__) && defined(LOG_UTILS_EXPORTS)
-        #define LOG_UTILS_API __attribute__((visibility("default")))
+/* ========== 跨平台符号导出宏（仅独立编译模式构建库时有效）========== */
+#if defined(_WIN32)
+    #if defined(LOG_UTILS_BUILD)
+        #define LOG_UTILS_EXPORT __declspec(dllexport)
     #else
-        #define LOG_UTILS_API
+        #define LOG_UTILS_EXPORT  /* 用户使用动态库时，无导入标记也可链接 */
+    #endif
+#elif defined(__GNUC__)
+    #if defined(LOG_UTILS_BUILD)
+        #define LOG_UTILS_EXPORT __attribute__((visibility("default")))
+    #else
+        #define LOG_UTILS_EXPORT
     #endif
 #else
-    /* 头文件模式下所有函数均为 static inline */
+    #define LOG_UTILS_EXPORT
+#endif
+
+/* ========== API 宏定义：根据模式选择 static inline 或外部符号 ========== */
+#ifdef LOG_UTILS_HEAD_ONLY
     #define LOG_UTILS_API static inline
+#else
+    #define LOG_UTILS_API LOG_UTILS_EXPORT
 #endif
 
 /**
@@ -52,7 +62,7 @@ typedef struct s_st_logger_config
     log_output_func_t  output_func; /*!< 输出函数指针 */
 } logger_t;
 
-/* ========== 日志器生命周期管理 ========== */
+/* ========== 函数声明（始终可见）========== */
 
 /**
  * @brief 创建一个新的日志器实例
@@ -67,8 +77,6 @@ LOG_UTILS_API logger_t* logger_create(log_level_t level, log_output_func_t func)
  * @param logger 要销毁的日志器指针
  */
 LOG_UTILS_API void logger_destroy(logger_t *logger);
-
-/* ========== 日志器配置 ========== */
 
 /**
  * @brief 设置日志等级阈值
@@ -90,8 +98,6 @@ LOG_UTILS_API log_level_t logger_get_level(const logger_t *logger);
  * @param func   新的输出函数指针，若为 NULL 则恢复为默认 printf
  */
 LOG_UTILS_API void logger_set_output(logger_t *logger, log_output_func_t func);
-
-/* ========== 日志记录 ========== */
 
 /**
  * @brief 核心日志记录函数（va_list 版本）
@@ -118,8 +124,8 @@ LOG_UTILS_API void logger_log(logger_t *logger, log_level_t level, const char *f
 #define LOG_D(logger, ...) logger_log(logger, LOG_LEVEL_D, __VA_ARGS__)
 #define LOG_T(logger, ...) logger_log(logger, LOG_LEVEL_T, __VA_ARGS__)
 
-/* ========== Header‑only 模式下的函数实现 ========== */
-#ifdef LOG_UTILS_HEAD_ONLY
+/* ========== 函数定义：仅在 header-only 模式或独立编译的实现文件中提供 ========== */
+#if defined(LOG_UTILS_HEAD_ONLY) || defined(LOG_UTILS_IMPLEMENTATION)
 
 LOG_UTILS_API logger_t* logger_create(log_level_t level, log_output_func_t func)
 {
@@ -215,7 +221,7 @@ LOG_UTILS_API void logger_log(logger_t *logger, log_level_t level, const char *f
     va_end(args);
 }
 
-#endif /* LOG_UTILS_HEAD_ONLY */
+#endif /* LOG_UTILS_HEAD_ONLY || LOG_UTILS_IMPLEMENTATION */
 
 #ifdef __cplusplus
 }
