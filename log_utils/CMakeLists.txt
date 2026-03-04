@@ -7,21 +7,25 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 include(GNUInstallDirs)
 
-# 头文件目录
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/inc)
-
-# 源文件
-set(LOG_UTILS_SRC src/log_utils.c)
-set(LOG_UTILS_HDR inc/log_utils.h)
-
-# 选项：是否构建库（如果为 OFF，则只安装头文件，实现 header-only 模式）
-option(BUILD_LOG_UTILS_LIB "Build log_utils library (shared or static)" ON)
+# 选项：header-only 模式（不构建库）
+option(LOG_UTILS_HEAD_ONLY "Use header-only mode (no library build)" OFF)
+# 当构建库时，由 BUILD_SHARED_LIBS 控制动态/静态
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 
-if(BUILD_LOG_UTILS_LIB)
+# 头文件
+set(LOG_UTILS_HDR inc/log_utils.h)
+
+# 安装头文件（任何模式下都安装）
+install(FILES ${LOG_UTILS_HDR} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/log_utils)
+
+if(NOT LOG_UTILS_HEAD_ONLY)
+    # ========== 构建库模式 ==========
+    set(LOG_UTILS_SRC src/log_utils.c)
+
     if(BUILD_SHARED_LIBS)
         add_library(log_utils SHARED ${LOG_UTILS_SRC})
-        target_compile_definitions(log_utils PRIVATE LOG_UTILS_EXPORTS)
+        # 动态库需要导出符号
+        target_compile_definitions(log_utils PRIVATE LOG_UTILS_BUILD)
     else()
         add_library(log_utils STATIC ${LOG_UTILS_SRC})
     endif()
@@ -37,14 +41,7 @@ if(BUILD_LOG_UTILS_LIB)
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/log_utils>
     )
 
-    # 演示程序
-    add_executable(log_utils_demo demo/log_utils_demo.c)
-    target_link_libraries(log_utils_demo log_utils)
-    set_target_properties(log_utils_demo PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    )
-
-    # 安装规则
+    # 安装库和导出配置
     install(TARGETS log_utils
         EXPORT log_utilsTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -52,13 +49,7 @@ if(BUILD_LOG_UTILS_LIB)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/log_utils
     )
-else()
-    # 不构建库，只安装头文件
-    install(FILES ${LOG_UTILS_HDR} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/log_utils)
-endif()
 
-# 导出和配置文件（仅在构建库时生成）
-if(BUILD_LOG_UTILS_LIB)
     install(EXPORT log_utilsTargets
         FILE log_utilsTargets.cmake
         NAMESPACE log_utils::
@@ -85,4 +76,22 @@ if(BUILD_LOG_UTILS_LIB)
         ${CMAKE_CURRENT_BINARY_DIR}/log_utilsConfigVersion.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/log_utils
     )
+else()
+    message(STATUS "Header-only mode: no library will be built. Only headers installed.")
 endif()
+
+# ========== 演示程序（始终构建） ==========
+add_executable(log_utils_demo demo/log_utils_demo.c)
+target_include_directories(log_utils_demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)
+
+if(NOT LOG_UTILS_HEAD_ONLY)
+    # 独立库模式：链接库
+    target_link_libraries(log_utils_demo log_utils)
+else()
+    # Header-only 模式：需要定义宏以获取函数实现
+    target_compile_definitions(log_utils_demo PRIVATE LOG_UTILS_HEAD_ONLY)
+endif()
+
+set_target_properties(log_utils_demo PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
